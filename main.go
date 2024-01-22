@@ -2,20 +2,63 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/Anshu-rai89/key-value-store/keyvaluestore"
 )
 
-// ... (previously provided HandleSet and HandleGet functions)
+// HandleSet handles the HTTP endpoint for setting key-value pairs.
+func HandleSet(kv *keyvaluestore.KeyValueStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		}
+
+		err := json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+
+		kv.Set(req.Key, req.Value)
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+// HandleGet handles the HTTP endpoint for retrieving values by key.
+func HandleGet(kv *keyvaluestore.KeyValueStore) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		key := r.URL.Query().Get("key")
+		if key == "" {
+			http.Error(w, "Key parameter is missing", http.StatusBadRequest)
+			return
+		}
+
+		val, ok := kv.Get(key)
+		if !ok {
+			http.Error(w, "Key not found", http.StatusNotFound)
+			return
+		}
+
+		resp := struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		}{Key: key, Value: val}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}
+}
 
 func main() {
 	// Create a new instance of KeyValueStore
 	kv := keyvaluestore.NewKeyValueStore()
 
 	// Set up HTTP handlers
-	http.HandleFunc("/set", HandleSet(kv))
+	http.HandleFunc("/set", HandleGet(kv))
 	http.HandleFunc("/get", HandleGet(kv))
 
 	// Start the HTTP server
